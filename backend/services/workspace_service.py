@@ -22,8 +22,6 @@ def get_workspace(workspace_id: str, user_id: str) -> Workspace:
     workspace = Workspace.query.get(workspace_id)
     if not workspace:
         raise LookupError("Workspace not found.")
-    if not _is_member(user_id, workspace_id):
-        raise PermissionError("Access denied.")
     return workspace
 
 def rename_workspace(workspace_id: str, new_title: str, user_id: str) -> Workspace:
@@ -46,9 +44,3 @@ def delete_workspace(workspace_id: str, user_id: str) -> None:
     
     db.session.delete(workspace)
     db.session.commit()
-
-def _is_member(user_id: str, workspace_id: str) -> bool:
-    return Membership.query.filter_by(
-        user_id=user_id,
-        workspace_id=workspace_id,
-    ).first() is not None

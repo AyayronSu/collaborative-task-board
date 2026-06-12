@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, session
+from utils.auth import login_required, workspace_member_required
 from services.workspace_service import (
     create_workspace,
     get_user_workspaces,
@@ -9,14 +10,9 @@ from services.workspace_service import (
 
 workspaces_bp = Blueprint("workspaces", __name__, url_prefix="/api/workspaces")
 
-def _require_auth():
-    """Returns user_id from session or raises a 401 tuple."""
-    user_id = session.get("user_id")
-    if not user_id:
-        return None, (jsonify({"error": "Not authenticated."}), 401)
-    return user_id, None
 
 @workspaces_bp.post("/")
+@login_required
 def create():
     user_id, err = _require_auth()
     if err:
@@ -30,6 +26,7 @@ def create():
     return jsonify({"workspace": workspace.to_dict()}), 201
 
 @workspaces_bp.get("/")
+@login_required
 def list_all():
     user_id, err = _require_auth()
     if err:
@@ -39,6 +36,8 @@ def list_all():
     return jsonify({"workspaces": [w.to_dict() for w in workspaces]}), 200
 
 @workspaces_bp.get("/<workspace_id>")
+@login_required
+@workspace_member_required
 def get_one(workspace_id):
     user_id, err = _require_auth()
     if err:
@@ -54,6 +53,8 @@ def get_one(workspace_id):
     return jsonify({"workspace": workspace.to_dict()}), 200
 
 @workspaces_bp.patch("/<workspace_id>")
+@login_required
+@workspace_member_required
 def rename(workspace_id):
     user_id, err = _require_auth()
     if err:
@@ -73,6 +74,8 @@ def rename(workspace_id):
     return jsonify({"workspace": workspace.to_dict()}), 200
 
 @workspaces_bp.delete("/<workspace_id>")
+@login_required
+@workspace_member_required
 def delete(workspace_id):
     user_id, err = _require_auth()
     if err:

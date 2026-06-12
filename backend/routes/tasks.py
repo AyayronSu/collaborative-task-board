@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, session
+from utils.auth import login_required, workspace_member_required
 from services.task_service import (
     create_task,
     get_workspace_tasks,
@@ -8,13 +9,10 @@ from services.task_service import (
 
 tasks_bp = Blueprint("tasks", __name__, url_prefix="/api/workspaces/<workspace_id>/tasks")
 
-def _require_auth():
-    user_id = session.get("user_id")
-    if not user_id:
-        return None, (jsonify({"error": "Not authenticated."})), 401
-    return user_id, None
 
 @tasks_bp.post("/")
+@login_required
+@workspace_member_required
 def create(workspace_id):
     user_id, err = _require_auth()
     if err:
@@ -32,6 +30,8 @@ def create(workspace_id):
     return jsonify({"task": task.to_dict()}), 201
 
 @tasks_bp.get("/")
+@login_required
+@workspace_member_required
 def list_all(workspace_id):
     user_id, err = _require_auth()
     if err:
@@ -45,6 +45,8 @@ def list_all(workspace_id):
     return jsonify({"tasks": [t.to_dict() for t in tasks]}), 200
 
 @tasks_bp.patch("/<task_id>")
+@login_required
+@workspace_member_required
 def update(workspace_id, task_id):
     user_id, err = _require_auth()
     if err:
@@ -68,6 +70,8 @@ def update(workspace_id, task_id):
     return jsonify({"task": task.to_dict()}), 200
 
 @tasks_bp.delete("/<task_id>")
+@login_required
+@workspace_member_required
 def delete(workspace_id, task_id):
     user_id, err = _require_auth()
     if err:
