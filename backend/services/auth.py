@@ -24,7 +24,7 @@ def signup():
     return jsonify({"user": user.to_dict()}), 201
 
 @auth_bp.post("/login")
-def login()
+def login():
     data  = request.get_json()
     email    = (data.get("email")   or "").strip().lower()
     password = data.get("password") or ""
