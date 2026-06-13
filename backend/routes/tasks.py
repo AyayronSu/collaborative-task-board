@@ -7,7 +7,11 @@ from services.task_service import (
     update_task,
     delete_task,
 )
-from sockets.events import broadcast_task_created
+from sockets.events import (
+    broadcast_task_created,
+    broadcast_task_updated,
+    broadcast_task_deleted,
+)
 
 tasks_bp = Blueprint("tasks", __name__, url_prefix="/api/workspaces/<workspace_id>/tasks")
 
@@ -50,6 +54,7 @@ def update(workspace_id, task_id, user_id):
     except ValueError as e:
         return jsonify({"error": str(e)}), 422
 
+    broadcast_task_updated(workspace_id, task)
     return jsonify({"task": task.to_dict()}), 200
 
 
@@ -61,5 +66,6 @@ def delete(workspace_id, task_id, user_id):
         delete_task(task_id)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
-
+    
+    broadcast_task_deleted(workspace_id, task_id)
     return jsonify({"message": "Task deleted."}), 200
