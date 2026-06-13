@@ -22,19 +22,19 @@ export default function Login({ onLogin }) {
     }
 
     return (
-        <div>
-            <h1>Login</h1>
-            <form className="form" onSubmit={submit}>
-                <label>Email</label>
-                <input type="email" value={form.email} onChange={set('email')} required />
-                <label>Password</label>
-                <input type="password" value={form.password} onChange={set('password')} required/>
-                <button type="submit">Log in</button>
-                {error && <p className="error">{error}</p>}
-            </form>
-            <p style={{ marginTop: '1rem'}}>
-                No account? <Link to="/signup">Sign up</Link>
-            </p>
+        <div className="auth-page">
+            <div className="auth-card">
+                <h1>Sign in</h1>
+                <form className="form" onSubmit={submit}>
+                    <label>Email</label>
+                    <input type="email" value={form.email} onChange={set('email')} required />
+                    <label>Password</label>
+                    <input type="password" value={form.password} onChange={set('password')} required />
+                    <button type="submit" className="primary">Sign in</button>
+                    {error && <p className="error">{error}</p>}
+                </form>
+                <p className="auth-footer">No account? <Link to="/signup">Sign up</Link></p>
+            </div>
         </div>
     )
 }
