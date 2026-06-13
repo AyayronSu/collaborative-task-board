@@ -9,48 +9,46 @@ const STATUSES = ['todo', 'in_progress', 'done']
 const LABELS   = { todo: 'To do', in_progress: 'In progress', done: 'Done' }
 
 export default function Board({ user, onLogout }) {
-  const { id: workspaceId }     = useParams()
-  const [tasks,    setTasks]    = useState([])
-  const [title,    setTitle]    = useState('')
-  const [error,    setError]    = useState('')
-  const [members,  setMembers]  = useState([])
-  const [email,    setEmail]    = useState('')
-  const [memError, setMemError] = useState('')
-  const [online,   setOnline]   = useState([])
+  const { id: workspaceId }      = useParams()
+  const [tasks,    setTasks]     = useState([])
+  const [title,    setTitle]     = useState('')
+  const [error,    setError]     = useState('')
+  const [members,  setMembers]   = useState([])
+  const [email,    setEmail]     = useState('')
+  const [memError, setMemError]  = useState('')
+  const [online,   setOnline]    = useState([])
+  const [activity, setActivity]  = useState([])
 
+  const pushActivity = (message) => {
+    setActivity(log => [
+      { id: Date.now(), message, ts: new Date().toLocaleTimeString() },
+      ...log,
+    ].slice(0, 20))
+  }
+
+  // join/leave room — pass user info so backend can track presence
   useEffect(() => {
-    socket.emit("join_workspace", { 
+    socket.emit("join_workspace", {
       workspace_id: workspaceId,
       user: { id: user.id, username: user.username },
-     })
-
-    socket.on("room_joined", (data) => {
-      console.log(`[WS] room joined: ${data.workspace_id}`)
     })
 
-    socket.on("presence_updated", (data) => {
-      console.log("[WS] presence:", data.users)
-      setOnline(data.users)
-    })
+    socket.on("room_joined",       (data) => console.log(`[WS] room joined: ${data.workspace_id}`))
+    socket.on("presence_updated",  (data) => setOnline(data.users))
+    socket.on("activity",          (data) => pushActivity(data.message))
 
     return () => {
       socket.emit("leave_workspace", { workspace_id: workspaceId })
       socket.off("room_joined")
       socket.off("presence_updated")
+      socket.off("activity")
     }
   }, [workspaceId])
 
   useEffect(() => {
-    socket.on("task_created", (data) => {
-      setTasks(ts => [...ts, data.task])
-    })
-    socket.on("task_updated", (data) => {
-      setTasks(ts => ts.map(t => t.id === data.task.id ? data.task : t))
-    })
-
-    socket.on("task_deleted", (data) => {
-      setTasks(ts => ts.filter(t => t.id !== data.task_id))
-    })
+    socket.on("task_created", (data) => setTasks(ts => [...ts, data.task]))
+    socket.on("task_updated", (data) => setTasks(ts => ts.map(t => t.id === data.task.id ? data.task : t)))
+    socket.on("task_deleted", (data) => setTasks(ts => ts.filter(t => t.id !== data.task_id)))
     return () => {
       socket.off("task_created")
       socket.off("task_updated")
@@ -58,6 +56,8 @@ export default function Board({ user, onLogout }) {
     }
   }, [])
 
+
+  // load tasks and members on mount
   useEffect(() => {
     getTasks(workspaceId)
       .then(res => setTasks(res.data.tasks))
@@ -124,7 +124,7 @@ export default function Board({ user, onLogout }) {
     <div>
       <nav>
         <Link to="/">← Workspaces</Link>
-         <span style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <span style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           {online.map(u => (
             <span key={u.id} style={{
               fontSize: '0.8rem',
@@ -186,12 +186,32 @@ export default function Board({ user, onLogout }) {
       </div>
 
       <div style={{ marginTop: '2rem', borderTop: '1px solid #ccc', paddingTop: '1.5rem'}}>
+        <h2>Activity</h2>
+        {activity.length === 0
+          ? <p style={{ color: '#888', fontSize: '0.9rem' }}>No activity yet.</p>
+          : activity.map(e => (
+            <div key={e.id} style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              padding: '0.4rem 0',
+              borderBottom: '1px solid #eee',
+              fontSize: '0.9rem',
+            }}>
+              <span>{e.message}</span>
+              <span style={{ color: '#888', fontSize: '0.8rem'}}>{e.ts}</span>
+            </div>
+          ))
+          }
+      </div>
+
+      {/* members panel */}
+      <div style={{ marginTop: '2rem', borderTop: '1px solid #ccc', paddingTop: '1.5rem' }}>
         <h2>Members</h2>
 
-        <form className="row" onSubmit={inviteMember} style={{ margin: '1rem 0'}}>
-          <input 
-            type="email" 
-            placeholder='Invite by email'
+        <form className="row" onSubmit={inviteMember} style={{ margin: '1rem 0' }}>
+          <input
+            type="email"
+            placeholder="Invite by email"
             value={email}
             onChange={e => setEmail(e.target.value)}
           />
@@ -200,7 +220,7 @@ export default function Board({ user, onLogout }) {
 
         {memError && <p className="error">{memError}</p>}
 
-         {members.map(m => (
+        {members.map(m => (
           <div className="workspace-item" key={m.id}>
             <span>
               {online.find(u => u.id === m.id) ? '🟢' : '⚫️'} {m.username} — {m.email}
