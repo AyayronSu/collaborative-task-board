@@ -6,6 +6,8 @@ from services.task_service import (
     update_task,
     delete_task,
 )
+from app import socketio
+from sockets.events import broadcast_task_created
 
 tasks_bp = Blueprint("tasks", __name__, url_prefix="/api/workspaces/<workspace_id>/tasks")
 
@@ -19,13 +21,13 @@ def create(workspace_id, user_id):
         return jsonify({"error": "title` is required."}), 400
     
     task = create_task(title, workspace_id, user_id)
+    broadcast_task_created(socketio, workspace_id, task)
     return jsonify({"task": task.to_dict()}), 201
 
 @tasks_bp.get("/")
 @login_required
 @workspace_member_required
 def list_all(workspace_id, user_id):
-
     tasks = get_workspace_tasks(workspace_id, user_id)
     return jsonify({"tasks": [t.to_dict() for t in tasks]}), 200
 
