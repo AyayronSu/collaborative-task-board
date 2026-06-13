@@ -18,15 +18,22 @@ def register_events(socketio):
     @socketio.on("join_workspace")
     def on_join(data):
         workspace_id = data.get("workspace_id")
-        sid = request.sid
         join_room(workspace_id)
-        print(f"[WS] {sid} joined room: {workspace_id}")
+        print(f"[WS] {request.sid} joined room: {workspace_id}")
         emit("room_joined", {"workspace_id": workspace_id})
 
     @socketio.on("leave_workspace")
     def on_leave(data):
         workspace_id = data.get("workspace_id")
-        sid = request.sid
         leave_room(workspace_id)
-        print(f"[WS] {sid} left room: {workspace_id}")
+        print(f"[WS] {request.sid} left room: {workspace_id}")
         emit("room_left", {"workspace_id": workspace_id})
+
+
+def broadcast_task_created(socketio, workspace_id, task):
+    socketio.emit(
+        "task_created",
+        {"task": task.to_dict()},
+        room=workspace_id,
+    )
+    print(f"[WS] task_created broadcast to room: {workspace_id}")
