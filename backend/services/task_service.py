@@ -1,16 +1,19 @@
-from models import db, Task, TaskStatus, Membership
+# backend/services/task_service.py
+from models import db, Task, TaskStatus
 
-    
-def create_task(title: str, workspace_id: str, user_id: str) -> Task:
+
+def create_task(title: str, workspace_id: str) -> Task:
     task = Task(title=title, workspace_id=workspace_id, status=TaskStatus.TODO)
     db.session.add(task)
     db.session.commit()
     return task
 
-def get_workspace_tasks(workspace_id: str, user_id: str) -> list[Task]:
+
+def get_workspace_tasks(workspace_id: str) -> list[Task]:
     return Task.query.filter_by(workspace_id=workspace_id).all()
 
-def update_task(task_id: str, user_id: str, **fields) -> Task:
+
+def update_task(task_id: str, **fields) -> Task:
     task = Task.query.get(task_id)
     if not task:
         raise LookupError("Task not found.")
@@ -27,11 +30,12 @@ def update_task(task_id: str, user_id: str, **fields) -> Task:
         except ValueError:
             valid = [s.value for s in TaskStatus]
             raise ValueError(f"Invalid status. Must be one of: {valid}")
-        
-        db.session.commit()
-        return task
-    
-def delete_task(task_id: str, user_id: str) -> None:
+
+    db.session.commit()
+    return task
+
+
+def delete_task(task_id: str) -> None:
     task = Task.query.get(task_id)
     if not task:
         raise LookupError("Task not found.")
