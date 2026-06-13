@@ -24,10 +24,12 @@ def create_app(config_class=Config):
     from routes.auth import auth_bp
     from routes.workspaces import workspaces_bp
     from routes.tasks import tasks_bp
+    from routes.memberships import memberships_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(workspaces_bp)
     app.register_blueprint(tasks_bp)
+    app.register_blueprint(memberships_bp)
 
     from sockets.events import register_events
     register_events(socketio)
