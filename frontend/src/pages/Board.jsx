@@ -1,3 +1,4 @@
+// frontend/src/pages/Board.jsx
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { getTasks, createTask, updateTask, deleteTask } from '../api/tasks'
@@ -12,21 +13,35 @@ export default function Board({ user, onLogout }) {
   const [title,   setTitle]  = useState('')
   const [error,   setError]  = useState('')
 
+  // join/leave room
   useEffect(() => {
     socket.emit("join_workspace", { workspace_id: workspaceId })
-    console.log(`[WS] joining workspace room: ${workspaceId}`)
 
     socket.on("room_joined", (data) => {
-      console.log(`[WS] room joined:`, data.workspace_id)
+      console.log(`[WS] room joined: ${data.workspace_id}`)
     })
 
     return () => {
       socket.emit("leave_workspace", { workspace_id: workspaceId })
-      console.log(`[WS] leaving workspace room: ${workspaceId}`)
       socket.off("room_joined")
     }
   }, [workspaceId])
 
+  // real-time task_created from other users
+  useEffect(() => {
+    socket.on("task_created", (data) => {
+      console.log("[WS] task_created received:", data.task)
+      setTasks(ts => {
+        // ignore if we already have it (we added it optimistically ourselves)
+        if (ts.find(t => t.id === data.task.id)) return ts
+        return [...ts, data.task]
+      })
+    })
+
+    return () => socket.off("task_created")
+  }, [])
+
+  // load tasks on mount
   useEffect(() => {
     getTasks(workspaceId)
       .then(res => setTasks(res.data.tasks))
@@ -38,6 +53,7 @@ export default function Board({ user, onLogout }) {
     if (!title.trim()) return
     try {
       const res = await createTask(workspaceId, { title })
+      // add our own task immediately (don't wait for the socket event)
       setTasks(ts => [...ts, res.data.task])
       setTitle('')
     } catch (err) {
