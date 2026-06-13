@@ -1,8 +1,6 @@
-# backend/sockets/events.py
 from flask import request
 from flask_socketio import emit, join_room, leave_room
 
-# { workspace_id: { sid: {id, username} } }
 presence = {}
 
 
@@ -18,7 +16,6 @@ def register_events(socketio):
         sid = request.sid
         print(f"[WS] User disconnected — sid: {sid}")
 
-        # remove from any workspace room they were in
         for workspace_id, users in list(presence.items()):
             if sid in users:
                 user = users.pop(sid)
@@ -27,7 +24,6 @@ def register_events(socketio):
                     {"users": list(users.values())},
                     room=workspace_id,
                 )
-                print(f"[WS] {user['username']} left presence in room: {workspace_id}")
                 if not users:
                     del presence[workspace_id]
                 break
@@ -35,18 +31,15 @@ def register_events(socketio):
     @socketio.on("join_workspace")
     def on_join(data):
         workspace_id = data.get("workspace_id")
-        user         = data.get("user")  # {id, username}
+        user         = data.get("user")
         sid          = request.sid
 
         join_room(workspace_id)
-        print(f"[WS] {sid} joined room: {workspace_id}")
 
-        # add to presence
         if workspace_id not in presence:
             presence[workspace_id] = {}
         presence[workspace_id][sid] = user
 
-        # tell everyone in the room who's online
         socketio.emit(
             "presence_updated",
             {"users": list(presence[workspace_id].values())},
@@ -68,7 +61,6 @@ def register_events(socketio):
                 {"users": list(presence[workspace_id].values())},
                 room=workspace_id,
             )
-            print(f"[WS] {user['username']} left presence in room: {workspace_id}")
             if not presence[workspace_id]:
                 del presence[workspace_id]
 
@@ -77,28 +69,37 @@ def register_events(socketio):
     register_events.socketio = socketio
 
 
-def broadcast_task_created(workspace_id, task):
-    register_events.socketio.emit(
-        "task_created",
-        {"task": task.to_dict()},
-        room=workspace_id,
-    )
-    print(f"[WS] task_created broadcast to room: {workspace_id}")
+def _emit(workspace_id, event, payload):
+    register_events.socketio.emit(event, payload, room=workspace_id)
 
 
-def broadcast_task_updated(workspace_id, task):
-    register_events.socketio.emit(
-        "task_updated",
-        {"task": task.to_dict()},
-        room=workspace_id,
-    )
-    print(f"[WS] task_updated broadcast to room: {workspace_id}")
+def broadcast_task_created(workspace_id, task, actor: str):
+    _emit(workspace_id, "task_created", {"task": task.to_dict()})
+    _emit(workspace_id, "activity", {
+        "message": f"{actor} created \"{task.title}\"",
+    })
 
 
-def broadcast_task_deleted(workspace_id, task_id):
-    register_events.socketio.emit(
-        "task_deleted",
-        {"task_id": task_id},
-        room=workspace_id,
-    )
-    print(f"[WS] task_deleted broadcast to room: {workspace_id}")
+def broadcast_task_updated(workspace_id, task, actor: str, fields: dict):
+    _emit(workspace_id, "task_updated", {"task": task.to_dict()})
+
+    if "status" in fields:
+        from models import TaskStatus
+        labels = {
+            TaskStatus.TODO.value:        "To do",
+            TaskStatus.IN_PROGRESS.value: "In progress",
+            TaskStatus.DONE.value:        "Done",
+        }
+        label = labels.get(fields["status"], fields["status"])
+        message = f"{actor} moved \"{task.title}\" to {label}"
+    else:
+        message = f"{actor} renamed a task to \"{task.title}\""
+
+    _emit(workspace_id, "activity", {"message": message})
+
+
+def broadcast_task_deleted(workspace_id, task_id, task_title: str, actor: str):
+    _emit(workspace_id, "task_deleted", {"task_id": task_id})
+    _emit(workspace_id, "activity", {
+        "message": f"{actor} deleted \"{task_title}\"",
+    })

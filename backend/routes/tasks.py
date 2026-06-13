@@ -5,6 +5,7 @@ from services.task_service import (
     get_workspace_tasks,
     update_task,
     delete_task,
+    get_task_by_id
 )
 from services.auth_service import get_user_by
 from sockets.events import (
