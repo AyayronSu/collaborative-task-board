@@ -9,22 +9,34 @@ const STATUSES = ['todo', 'in_progress', 'done']
 const LABELS   = { todo: 'To do', in_progress: 'In progress', done: 'Done' }
 
 export default function Board({ user, onLogout }) {
-  const { id: workspaceId }  = useParams()
-  const [tasks,   setTasks]   = useState([])
-  const [title,   setTitle]   = useState('')
-  const [error,   setError]   = useState('')
-  const [members, setMembers] = useState([])
-  const [email,   setEmail]   = useState('')
+  const { id: workspaceId }     = useParams()
+  const [tasks,    setTasks]    = useState([])
+  const [title,    setTitle]    = useState('')
+  const [error,    setError]    = useState('')
+  const [members,  setMembers]  = useState([])
+  const [email,    setEmail]    = useState('')
   const [memError, setMemError] = useState('')
+  const [online,   setOnline]   = useState([])
 
   useEffect(() => {
-    socket.emit("join_workspace", { workspace_id: workspaceId })
+    socket.emit("join_workspace", { 
+      workspace_id: workspaceId,
+      user: { id: user.id, username: user.username },
+     })
+
     socket.on("room_joined", (data) => {
       console.log(`[WS] room joined: ${data.workspace_id}`)
     })
+
+    socket.on("presence_updated", (data) => {
+      console.log("[WS] presence:", data.users)
+      setOnline(data.users)
+    })
+
     return () => {
       socket.emit("leave_workspace", { workspace_id: workspaceId })
       socket.off("room_joined")
+      socket.off("presence_updated")
     }
   }, [workspaceId])
 
@@ -112,6 +124,19 @@ export default function Board({ user, onLogout }) {
     <div>
       <nav>
         <Link to="/">← Workspaces</Link>
+         <span style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {online.map(u => (
+            <span key={u.id} style={{
+              fontSize: '0.8rem',
+              background: '#e6f4ea',
+              border: '1px solid #a8d5b5',
+              borderRadius: '999px',
+              padding: '0.2rem 0.7rem',
+            }}>
+              🟢 {u.username}
+            </span>
+          ))}
+        </span>
         <button className="ghost" onClick={onLogout}>Log out</button>
       </nav>
 
@@ -175,9 +200,11 @@ export default function Board({ user, onLogout }) {
 
         {memError && <p className="error">{memError}</p>}
 
-        {members.map(m => (
+         {members.map(m => (
           <div className="workspace-item" key={m.id}>
-            <span>{m.username} - {m.email}</span>
+            <span>
+              {online.find(u => u.id === m.id) ? '🟢' : '⚫️'} {m.username} — {m.email}
+            </span>
             {m.id !== user.id && (
               <button className="danger" onClick={() => kickMember(m.id)}>Remove</button>
             )}
