@@ -1,4 +1,3 @@
-# backend/services/task_service.py
 from models import db, Task, TaskStatus
 
 
@@ -42,3 +41,9 @@ def delete_task(task_id: str) -> None:
 
     db.session.delete(task)
     db.session.commit()
+
+def get_task_by_id(task_id: str) -> Task:
+    task = Task.query.get(task_id)
+    if not task:
+        raise LookupError("Task not found.")
+    return task
