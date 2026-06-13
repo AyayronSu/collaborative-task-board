@@ -13,7 +13,6 @@ export default function Board({ user, onLogout }) {
   const [title,   setTitle]  = useState('')
   const [error,   setError]  = useState('')
 
-  // join/leave room
   useEffect(() => {
     socket.emit("join_workspace", { workspace_id: workspaceId })
 
@@ -27,18 +26,27 @@ export default function Board({ user, onLogout }) {
     }
   }, [workspaceId])
 
-  // real-time task_created from other users
   useEffect(() => {
     socket.on("task_created", (data) => {
       console.log("[WS] task_created received:", data.task)
-      setTasks(ts => {
-        // ignore if we already have it (we added it optimistically ourselves)
-        if (ts.find(t => t.id === data.task.id)) return ts
-        return [...ts, data.task]
-      })
+      setTasks(ts => [...ts, data.task])
     })
 
-    return () => socket.off("task_created")
+    socket.on("task_updated", (data) => {
+      console.log("[WS] task_updated:", data.task)
+      setTasks(ts => ts.map(t => t.id === data.task.id ? data.task : t))
+    })
+
+    socket.on("task_deleted", (data) => {
+      console.log("[WS] task_deleted:", data.task_id)
+      setTasks(ts => ts.filter(t => t.id !== data.task_id))
+    })
+
+    return () => {
+      socket.off("task_created")
+      socket.off("task_updated")
+      socket.off("task_deleted")
+    }
   }, [])
 
   // load tasks on mount
@@ -52,9 +60,7 @@ export default function Board({ user, onLogout }) {
     e.preventDefault()
     if (!title.trim()) return
     try {
-      const res = await createTask(workspaceId, { title })
-      // add our own task immediately (don't wait for the socket event)
-      setTasks(ts => [...ts, res.data.task])
+      await createTask(workspaceId, { title })
       setTitle('')
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create task.')
@@ -63,8 +69,7 @@ export default function Board({ user, onLogout }) {
 
   const move = async (task, newStatus) => {
     try {
-      const res = await updateTask(workspaceId, task.id, { status: newStatus })
-      setTasks(ts => ts.map(t => t.id === task.id ? res.data.task : t))
+      await updateTask(workspaceId, task.id, { status: newStatus })
     } catch (err) {
       setError('Failed to update task.')
     }
@@ -73,7 +78,6 @@ export default function Board({ user, onLogout }) {
   const remove = async (id) => {
     try {
       await deleteTask(workspaceId, id)
-      setTasks(ts => ts.filter(t => t.id !== id))
     } catch (err) {
       setError('Failed to delete task.')
     }
