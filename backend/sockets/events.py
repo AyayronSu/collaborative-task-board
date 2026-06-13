@@ -1,4 +1,3 @@
-# backend/sockets/events.py
 from flask import request
 from flask_socketio import emit, join_room, leave_room
 
@@ -39,3 +38,19 @@ def broadcast_task_created(workspace_id, task):
         room=workspace_id,
     )
     print(f"[WS] task_created broadcast to room: {workspace_id}")
+
+def broadcast_task_updated(workspace_id, task):
+    register_events.socketio.emit(
+        "task_updated",
+        {"task": task.to_dict()},
+        room=workspace_id,
+    )
+    print(f"[WS] task_updated broadcast room: {workspace_id}")
+
+def broadcast_task_deleted(workspace_id, task_id):
+    register_events.socketio.emit(
+        "task_deleted",
+        {"task_id": task_id},
+        room=workspace_id,
+    )
+    print(f"[WS] task_deleted broadcast to room: {workspace_id}")
