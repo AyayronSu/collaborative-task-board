@@ -21,3 +21,9 @@ def authenticate_user(email: str, password: str) -> User:
     if not user or not check_password_hash(user.password_hash, password):
         raise ValueError("Invalid email or password.")
     return user
+
+def get_user_by_id(user_id: str):
+    user = User.query.get(user_id)
+    if not user:
+        raise LookupError("User not found.")
+    return user
