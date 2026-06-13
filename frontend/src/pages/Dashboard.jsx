@@ -58,7 +58,7 @@ export default function Dashboard({ user, onLogout }) {
 
             {workspaces.map(w => (
                 <div className="workspace-item" key={w.id}>
-                    <Link to={`/workspaces/${w.id}`}>{w.title}</Link>
+                    <Link to={`/workspace/${w.id}`}>{w.title}</Link>
                     {w.created_by === user.id && (
                         <button className="danger" onClick={() => remove(w.id)}>Delete</button>
                     )}

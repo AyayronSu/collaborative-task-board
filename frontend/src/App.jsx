@@ -41,5 +41,3 @@ export default function App() {
     </Routes>
   )
 }
-
-export default App

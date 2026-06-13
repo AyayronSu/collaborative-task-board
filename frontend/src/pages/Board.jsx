@@ -12,9 +12,16 @@ export default function Board({ user, onLogout }) {
     const [error, setError] = useState('')
 
     useEffect(() => {
+        console.log('workspace id:', workspaceId)
         getTasks(workspaceId)
-            .then(res => setTasks(res.data.tasks))
-            .catch(() => setError('Failed to load tasks.'))
+            .then(res => {
+            console.log('tasks response:', res.data)
+            setTasks(res.data.tasks)
+            })
+            .catch((err) => {
+            console.log('tasks error:', err.response)
+            setError('Failed to load tasks.')
+            })
     }, [workspaceId])
 
     const create = async (e) => {
