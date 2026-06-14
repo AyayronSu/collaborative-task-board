@@ -9,9 +9,10 @@ import Dashboard from './pages/Dashboard'
 import Board from './pages/Board'
 
 export default function App() {
-  const [user, setUser]              = useState(undefined)
-  const [removedIds, setRemovedIds]  = useState([])
-  const navigate                     = useNavigate()
+  const [user,        setUser]        = useState(undefined)
+  const [removedIds,  setRemovedIds]  = useState([])
+  const [reconnecting, setReconnecting] = useState(false)
+  const navigate = useNavigate()
 
   const connectSocket = (u) => {
     socket.connect()
@@ -28,15 +29,23 @@ export default function App() {
       })
       .catch(() => setUser(null))
 
-    socket.on("connect", () => console.log("[WS] connected:", socket.id))
-    socket.on("disconnect", () => console.log("[WS] disconnected"))
+    socket.on("connect", () => {
+      console.log("[WS] connected:", socket.id)
+      setReconnecting(false)
+    })
+
+    socket.on("disconnect", () => {
+      console.log("[WS] disconnected")
+      setReconnecting(true)
+    })
+
+    socket.on("connect_error", () => {
+      setReconnecting(true)
+    })
 
     socket.on("workspace_removed", (data) => {
       const { workspace_id } = data
-      console.log("[WS] removed from workspace:", workspace_id)
-
       setRemovedIds(ids => [...ids, workspace_id])
-
       const onBoard = window.location.pathname === `/workspace/${workspace_id}`
       if (onBoard) {
         navigate('/', { state: { removedMessage: "You were removed from this workspace." } })
@@ -46,6 +55,7 @@ export default function App() {
     return () => {
       socket.off("connect")
       socket.off("disconnect")
+      socket.off("connect_error")
       socket.off("workspace_removed")
     }
   }, [])
@@ -62,18 +72,61 @@ export default function App() {
     connectSocket(u)
   }
 
-  if (user === undefined) return <p style={{ padding: '2rem' }}>Loading...</p>
+  // initial app load
+  if (user === undefined) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#6b7280',
+        fontSize: '0.9rem',
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="spinner" />
+          <p style={{ marginTop: '0.75rem' }}>Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <Routes>
-      <Route path="/login"  element={!user ? <Login  onLogin={handleLogin} /> : <Navigate to="/" />} />
-      <Route path="/signup" element={!user ? <Signup onLogin={handleLogin} /> : <Navigate to="/" />} />
-      <Route path="/" element={
-        user ? <Dashboard user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
-      } />
-      <Route path="/workspace/:id" element={
-        user ? <Board user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
-      } />
-    </Routes>
+    <>
+      {reconnecting && (
+        <div style={{
+          position: 'fixed',
+          bottom: '1rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: '#1a1a1a',
+          color: '#fff',
+          padding: '0.5rem 1.25rem',
+          borderRadius: '999px',
+          fontSize: '0.82rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          zIndex: 100,
+          boxShadow: '0 2px 12px rgba(0,0,0,0.2)',
+        }}>
+          <div className="spinner spinner-white" />
+          Reconnecting...
+        </div>
+      )}
+
+      <Routes>
+        <Route path="/login"  element={!user ? <Login  onLogin={handleLogin} /> : <Navigate to="/" />} />
+        <Route path="/signup" element={!user ? <Signup onLogin={handleLogin} /> : <Navigate to="/" />} />
+        <Route path="/" element={
+          user
+            ? <Dashboard user={user} onLogout={handleLogout} removedIds={removedIds} />
+            : <Navigate to="/login" />
+        } />
+        <Route path="/workspace/:id" element={
+          user ? <Board user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
+        } />
+      </Routes>
+    </>
   )
 }

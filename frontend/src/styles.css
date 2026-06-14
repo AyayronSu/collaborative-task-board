@@ -311,3 +311,27 @@ input:focus { border-color: #6366f1; }
   margin-bottom: 1.25rem;
 }
 .add-task-bar input { flex: 1; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.spinner-white {
+  border-color: rgba(255,255,255,0.3);
+  border-top-color: #fff;
+}
+
+.spinner-sm {
+  width: 12px;
+  height: 12px;
+}
