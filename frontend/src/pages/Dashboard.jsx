@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from 'react-router-dom'
 import { getWorkspaces, createWorkspace, deleteWorkspace } from '../api/workspaces'
+import socket from '../socket'
 
 export default function Dashboard({ user, onLogout }) {
     const [workspaces, setWorkspaces] = useState([])
@@ -11,6 +12,16 @@ export default function Dashboard({ user, onLogout }) {
         getWorkspaces()
           .then(res => setWorkspaces(res.data.workspaces))
           .catch(() => setError('Failed to load workspaces.'))
+
+        socket.on("workspace_added", (data) => {
+            console.log("[WS] workspace_added:", data.workspace)
+            setWorkspaces(ws => {
+                if (ws.find(w => w.id === data.workspace.id)) return ws
+                return [...ws, data.workspace]
+            })
+        })
+
+        return () => socket.off("workspace_added")
     }, [])
 
     const create = async (e) => {
