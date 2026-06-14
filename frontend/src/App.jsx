@@ -3,15 +3,20 @@ import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { getMe, logout } from './api/auth'
 import socket from './socket'
+import useNetworkStatus from './hooks/useNetworkStatus'
+import useToast from './hooks/useToast'
+import Toast from './components/Toast'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
 import Board from './pages/Board'
 
 export default function App() {
-  const [user,        setUser]        = useState(undefined)
-  const [removedIds,  setRemovedIds]  = useState([])
+  const [user,         setUser]         = useState(undefined)
+  const [removedIds,   setRemovedIds]   = useState([])
   const [reconnecting, setReconnecting] = useState(false)
+  const isOnline                        = useNetworkStatus()
+  const { toasts, addToast, dismissToast } = useToast()
   const navigate = useNavigate()
 
   const connectSocket = (u) => {
@@ -27,20 +32,31 @@ export default function App() {
         setUser(res.data.user)
         connectSocket(res.data.user)
       })
-      .catch(() => setUser(null))
+      .catch((err) => {
+        setUser(null)
+        if (err?.status === 0) {
+          addToast('Could not reach the server. Check your connection.', 'error', 6000)
+        }
+      })
 
     socket.on("connect", () => {
       console.log("[WS] connected:", socket.id)
       setReconnecting(false)
     })
 
-    socket.on("disconnect", () => {
-      console.log("[WS] disconnected")
+    socket.on("disconnect", (reason) => {
+      console.log("[WS] disconnected:", reason)
       setReconnecting(true)
+      if (reason === 'io server disconnect') {
+        // server actively closed the connection
+        addToast('Disconnected by server. Reconnecting...', 'warning')
+      }
     })
 
-    socket.on("connect_error", () => {
+    socket.on("connect_error", (err) => {
+      console.error("[WS] connection error:", err.message)
       setReconnecting(true)
+      addToast('WebSocket connection failed. Retrying...', 'warning', 3000)
     })
 
     socket.on("workspace_removed", (data) => {
@@ -60,6 +76,13 @@ export default function App() {
     }
   }, [])
 
+  // browser went offline
+  useEffect(() => {
+    if (!isOnline) {
+      addToast('You\'re offline. Changes won\'t sync until you reconnect.', 'warning', 8000)
+    }
+  }, [isOnline])
+
   const handleLogout = async () => {
     await logout()
     socket.disconnect()
@@ -72,7 +95,6 @@ export default function App() {
     connectSocket(u)
   }
 
-  // initial app load
   if (user === undefined) {
     return (
       <div style={{
@@ -93,7 +115,22 @@ export default function App() {
 
   return (
     <>
-      {reconnecting && (
+      {/* offline banner */}
+      {!isOnline && (
+        <div style={{
+          background: '#fef9c3',
+          borderBottom: '1px solid #fde047',
+          color: '#713f12',
+          textAlign: 'center',
+          padding: '0.4rem',
+          fontSize: '0.82rem',
+        }}>
+          You're offline — changes won't sync until you reconnect.
+        </div>
+      )}
+
+      {/* reconnecting pill */}
+      {reconnecting && isOnline && (
         <div style={{
           position: 'fixed',
           bottom: '1rem',
@@ -114,6 +151,8 @@ export default function App() {
           Reconnecting...
         </div>
       )}
+
+      <Toast toasts={toasts} onDismiss={dismissToast} />
 
       <Routes>
         <Route path="/login"  element={!user ? <Login  onLogin={handleLogin} /> : <Navigate to="/" />} />
