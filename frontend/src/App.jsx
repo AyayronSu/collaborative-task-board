@@ -9,8 +9,9 @@ import Dashboard from './pages/Dashboard'
 import Board from './pages/Board'
 
 export default function App() {
-  const [user, setUser]   = useState(undefined)
-  const navigate          = useNavigate()
+  const [user, setUser]              = useState(undefined)
+  const [removedIds, setRemovedIds]  = useState([])
+  const navigate                     = useNavigate()
 
   const connectSocket = (u) => {
     socket.connect()
@@ -30,9 +31,22 @@ export default function App() {
     socket.on("connect", () => console.log("[WS] connected:", socket.id))
     socket.on("disconnect", () => console.log("[WS] disconnected"))
 
+    socket.on("workspace_removed", (data) => {
+      const { workspace_id } = data
+      console.log("[WS] removed from workspace:", workspace_id)
+
+      setRemovedIds(ids => [...ids, workspace_id])
+
+      const onBoard = window.location.pathname === `/workspace/${workspace_id}`
+      if (onBoard) {
+        navigate('/', { state: { removedMessage: "You were removed from this workspace." } })
+      }
+    })
+
     return () => {
       socket.off("connect")
       socket.off("disconnect")
+      socket.off("workspace_removed")
     }
   }, [])
 
