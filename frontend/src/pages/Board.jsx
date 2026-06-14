@@ -1,6 +1,6 @@
 // frontend/src/pages/Board.jsx
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { getTasks, createTask, updateTask, deleteTask } from '../api/tasks'
 import { getMembers, addMember, removeMember } from '../api/memberships'
 import socket from '../socket'
@@ -10,6 +10,7 @@ const LABELS   = { todo: 'To do', in_progress: 'In progress', done: 'Done' }
 
 export default function Board({ user, onLogout }) {
   const { id: workspaceId }        = useParams()
+  const navigate                   = useNavigate()
   const [tasks,      setTasks]     = useState([])
   const [title,      setTitle]     = useState('')
   const [error,      setError]     = useState('')
@@ -21,6 +22,7 @@ export default function Board({ user, onLogout }) {
   const [loadingTasks,   setLoadingTasks]   = useState(true)
   const [loadingMembers, setLoadingMembers] = useState(true)
   const [socketReady,    setSocketReady]    = useState(false)
+  const [accessError,    setAccessError]    = useState('')
 
   const pushActivity = (message) => {
     setActivity(log => [
@@ -29,9 +31,7 @@ export default function Board({ user, onLogout }) {
     ].slice(0, 30))
   }
 
-  // join/leave room
   useEffect(() => {
-    // if socket is already connected, join immediately
     if (socket.connected) {
       socket.emit("join_workspace", {
         workspace_id: workspaceId,
@@ -48,10 +48,9 @@ export default function Board({ user, onLogout }) {
       setSocketReady(true)
     })
 
-    socket.on("room_joined", () => setSocketReady(true))
-
-    socket.on("presence_updated", (data) => setOnline(data.users))
-    socket.on("activity",         (data) => pushActivity(data.message))
+    socket.on("room_joined",       () => setSocketReady(true))
+    socket.on("presence_updated",  (data) => setOnline(data.users))
+    socket.on("activity",          (data) => pushActivity(data.message))
 
     return () => {
       socket.emit("leave_workspace", { workspace_id: workspaceId })
@@ -62,7 +61,6 @@ export default function Board({ user, onLogout }) {
     }
   }, [workspaceId])
 
-  // task listeners
   useEffect(() => {
     socket.on("task_created", (data) => setTasks(ts => [...ts, data.task]))
     socket.on("task_updated", (data) => setTasks(ts => ts.map(t => t.id === data.task.id ? data.task : t)))
@@ -74,16 +72,23 @@ export default function Board({ user, onLogout }) {
     }
   }, [])
 
-  // load data
   useEffect(() => {
     getTasks(workspaceId)
       .then(res => setTasks(res.data.tasks))
-      .catch(()  => setError('Failed to load tasks.'))
+      .catch(err => {
+        if (err?.status === 403) {
+          setAccessError('You don\'t have access to this workspace.')
+        } else if (err?.status === 404) {
+          setAccessError('This workspace doesn\'t exist.')
+        } else {
+          setError(err?.message || 'Failed to load tasks.')
+        }
+      })
       .finally(() => setLoadingTasks(false))
 
     getMembers(workspaceId)
       .then(res => setMembers(res.data.members))
-      .catch(()  => setMemError('Failed to load members.'))
+      .catch(() => setMemError('Failed to load members.'))
       .finally(() => setLoadingMembers(false))
   }, [workspaceId])
 
@@ -94,18 +99,18 @@ export default function Board({ user, onLogout }) {
       await createTask(workspaceId, { title })
       setTitle('')
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create task.')
+      setError(err?.message || 'Failed to create task.')
     }
   }
 
   const move = async (task, newStatus) => {
     try { await updateTask(workspaceId, task.id, { status: newStatus }) }
-    catch { setError('Failed to update task.') }
+    catch (err) { setError(err?.message || 'Failed to update task.') }
   }
 
   const remove = async (id) => {
     try { await deleteTask(workspaceId, id) }
-    catch { setError('Failed to delete task.') }
+    catch (err) { setError(err?.message || 'Failed to delete task.') }
   }
 
   const inviteMember = async (e) => {
@@ -117,7 +122,7 @@ export default function Board({ user, onLogout }) {
       setMembers(ms => [...ms, res.data.member])
       setEmail('')
     } catch (err) {
-      setMemError(err.response?.data?.error || 'Failed to add member.')
+      setMemError(err?.message || 'Failed to add member.')
     }
   }
 
@@ -126,12 +131,41 @@ export default function Board({ user, onLogout }) {
       await removeMember(workspaceId, targetUserId)
       setMembers(ms => ms.filter(m => m.id !== targetUserId))
     } catch (err) {
-      setMemError(err.response?.data?.error || 'Failed to remove member.')
+      setMemError(err?.message || 'Failed to remove member.')
     }
   }
 
   const isOnline = (id) => online.some(u => u.id === id)
   const byStatus = (status) => tasks.filter(t => t.status === status)
+
+  // access denied or workspace not found
+  if (accessError) {
+    return (
+      <>
+        <nav>
+          <Link to="/">← Workspaces</Link>
+          <div />
+          <button className="ghost" onClick={onLogout}>Sign out</button>
+        </nav>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: 'calc(100vh - 52px)',
+          gap: '0.75rem',
+          color: '#6b7280',
+          textAlign: 'center',
+        }}>
+          <p style={{ fontSize: '2rem' }}>🔒</p>
+          <h2 style={{ color: '#1a1a1a' }}>{accessError}</h2>
+          <button className="primary" onClick={() => navigate('/')}>
+            Back to workspaces
+          </button>
+        </div>
+      </>
+    )
+  }
 
   const boardLoading = loadingTasks && !socketReady
 
@@ -169,7 +203,6 @@ export default function Board({ user, onLogout }) {
         </div>
       ) : (
         <div className="board-layout">
-          {/* main board */}
           <div className="board-main">
             <div className="add-task-bar">
               <input
@@ -181,7 +214,25 @@ export default function Board({ user, onLogout }) {
               <button className="primary" onClick={create}>Add task</button>
             </div>
 
-            {error && <p className="error" style={{ marginBottom: '1rem' }}>{error}</p>}
+            {error && (
+              <div style={{
+                background: '#fef2f2',
+                border: '1px solid #fca5a5',
+                borderRadius: '6px',
+                padding: '0.6rem 0.9rem',
+                marginBottom: '1rem',
+                fontSize: '0.85rem',
+                color: '#991b1b',
+                display: 'flex',
+                justifyContent: 'space-between',
+              }}>
+                {error}
+                <button
+                  onClick={() => setError('')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: 0 }}
+                >×</button>
+              </div>
+            )}
 
             <div className="board">
               {STATUSES.map(status => (
@@ -208,7 +259,6 @@ export default function Board({ user, onLogout }) {
             </div>
           </div>
 
-          {/* sidebar */}
           <div className="board-sidebar">
             <div className="sidebar-section">
               <h3>Members</h3>
