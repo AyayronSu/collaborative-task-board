@@ -1,3 +1,4 @@
+# backend/routes/memberships.py
 from flask import Blueprint, request, jsonify
 from utils.auth import login_required, workspace_member_required
 from services.membership_service import (
@@ -5,7 +6,6 @@ from services.membership_service import (
     add_member_by_email,
     remove_member,
 )
-
 from services.workspace_service import get_workspace
 from sockets.events import broadcast_workspace_added
 
@@ -14,12 +14,14 @@ memberships_bp = Blueprint(
     url_prefix="/api/workspaces/<workspace_id>/members"
 )
 
+
 @memberships_bp.get("/")
 @login_required
 @workspace_member_required
 def list_members(workspace_id, user_id):
     members = get_workspace_members(workspace_id)
     return jsonify({"members": [m.to_dict() for m in members]}), 200
+
 
 @memberships_bp.post("/")
 @login_required
@@ -28,10 +30,10 @@ def add_member(workspace_id, user_id):
     email = (request.get_json().get("email") or "").strip()
     if not email:
         return jsonify({"error": "email is required."}), 400
-    
+
     try:
-        user = add_member_by_email(workspace_id, email, user_id)
-        workspace = get_workspace(workspace_id)
+        user      = add_member_by_email(workspace_id, email, user_id)
+        workspace = get_workspace(workspace_id, user_id)
         broadcast_workspace_added(user.id, workspace)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
@@ -39,8 +41,9 @@ def add_member(workspace_id, user_id):
         return jsonify({"error": str(e)}), 403
     except ValueError as e:
         return jsonify({"error": str(e)}), 409
-    
+
     return jsonify({"member": user.to_dict()}), 201
+
 
 @memberships_bp.delete("/<target_user_id>")
 @login_required
@@ -54,5 +57,5 @@ def remove_member_route(workspace_id, target_user_id, user_id):
         return jsonify({"error": str(e)}), 403
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    
+
     return jsonify({"message": "Member removed."}), 200
