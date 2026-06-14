@@ -118,3 +118,11 @@ def broadcast_workspace_added(user_id: str, workspace):
         room=f"user_{user_id}",
     )
     print(f"[WS] workspace_added sent to user room: user_{user_id}")
+
+def broadcast_workspace_removed(user_id: str, workspace_id: str):
+    register_events.socketio.emit(
+        "workspace_removed",
+        {"workspace_id": workspace_id},
+        room=f"user_{user_id}",
+    )
+    print(f"[WS] workspace_removed sent to user room: user_{user_id}")
