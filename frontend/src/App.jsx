@@ -1,5 +1,6 @@
+// frontend/src/App.jsx
 import { useEffect, useState } from 'react'
-import { Routes, Route, Navigate, useNavigate, useFetcher } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { getMe, logout } from './api/auth'
 import socket from './socket'
 import Login from './pages/Login'
@@ -8,35 +9,30 @@ import Dashboard from './pages/Dashboard'
 import Board from './pages/Board'
 
 export default function App() {
-  const [user, setUser]       = useState(undefined)
-  const navigate              = useNavigate()
+  const [user, setUser]   = useState(undefined)
+  const navigate          = useNavigate()
+
+  const connectSocket = (u) => {
+    socket.connect()
+    socket.once("connect", () => {
+      socket.emit("join_user_room", { user_id: u.id })
+    })
+  }
 
   useEffect(() => {
     getMe()
       .then(res => {
         setUser(res.data.user)
-        socket.connect()
+        connectSocket(res.data.user)
       })
       .catch(() => setUser(null))
-  }, [])
 
-  useEffect(() => {
-    socket.on("connect", () => {
-      console.log("[WS] connected:", socket.id)
-    })
-
-    socket.on("disconnect", () => {
-      console.log("[WS] disconnected")
-    })
-
-    socket.on("connected", (data) => {
-      console.log("[WS] server says:", data.message)
-    })
+    socket.on("connect", () => console.log("[WS] connected:", socket.id))
+    socket.on("disconnect", () => console.log("[WS] disconnected"))
 
     return () => {
       socket.off("connect")
       socket.off("disconnect")
-      socket.off("connected")
     }
   }, [])
 
@@ -47,18 +43,23 @@ export default function App() {
     navigate('/login')
   }
 
-  if (user === undefined) return <p>Loading...</p>
+  const handleLogin = (u) => {
+    setUser(u)
+    connectSocket(u)
+  }
 
-    return (
-      <Routes>
-        <Route path="/login"  element={!user ? <Login  onLogin={(u) => { setUser(u); socket.connect() }} /> : <Navigate to="/" />} />
-        <Route path="/signup" element={!user ? <Signup onLogin={(u) => { setUser(u); socket.connect() }} /> : <Navigate to="/" />} />
-        <Route path="/" element={
-          user ? <Dashboard user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
-        } />
-        <Route path="/workspace/:id" element={
-          user ? <Board user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
-        } />
-      </Routes>
-    )
+  if (user === undefined) return <p style={{ padding: '2rem' }}>Loading...</p>
+
+  return (
+    <Routes>
+      <Route path="/login"  element={!user ? <Login  onLogin={handleLogin} /> : <Navigate to="/" />} />
+      <Route path="/signup" element={!user ? <Signup onLogin={handleLogin} /> : <Navigate to="/" />} />
+      <Route path="/" element={
+        user ? <Dashboard user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
+      } />
+      <Route path="/workspace/:id" element={
+        user ? <Board user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
+      } />
+    </Routes>
+  )
 }
