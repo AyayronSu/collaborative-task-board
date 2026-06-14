@@ -6,6 +6,9 @@ from services.membership_service import (
     remove_member,
 )
 
+from services.workspace_service import get_workspace
+from sockets.events import broadcast_workspace_added
+
 memberships_bp = Blueprint(
     "memberships", __name__,
     url_prefix="/api/workspaces/<workspace_id>/members"
@@ -28,6 +31,8 @@ def add_member(workspace_id, user_id):
     
     try:
         user = add_member_by_email(workspace_id, email, user_id)
+        workspace = get_workspace(workspace_id)
+        broadcast_workspace_added(user.id, workspace)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     except PermissionError as e:
