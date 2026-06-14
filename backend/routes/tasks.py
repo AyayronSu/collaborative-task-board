@@ -1,3 +1,4 @@
+# backend/routes/tasks.py
 from flask import Blueprint, request, jsonify
 from utils.auth import login_required, workspace_member_required
 from services.task_service import (
@@ -5,9 +6,9 @@ from services.task_service import (
     get_workspace_tasks,
     update_task,
     delete_task,
-    get_task_by_id
+    get_task_by_id,
 )
-from services.auth_service import get_user_by
+from services.auth_service import get_user_by_id
 from sockets.events import (
     broadcast_task_created,
     broadcast_task_updated,
@@ -26,7 +27,7 @@ def create(workspace_id, user_id):
         return jsonify({"error": "title is required."}), 400
 
     task = create_task(title, workspace_id)
-    user = get_user_by(user_id)
+    user = get_user_by_id(user_id)
     broadcast_task_created(workspace_id, task, actor=user.username)
     return jsonify({"task": task.to_dict()}), 201
 
@@ -56,7 +57,7 @@ def update(workspace_id, task_id, user_id):
     except ValueError as e:
         return jsonify({"error": str(e)}), 422
 
-    user = get_user_by(user_id)
+    user = get_user_by_id(user_id)
     broadcast_task_updated(workspace_id, task, actor=user.username, fields=fields)
     return jsonify({"task": task.to_dict()}), 200
 
@@ -66,10 +67,11 @@ def update(workspace_id, task_id, user_id):
 @workspace_member_required
 def delete(workspace_id, task_id, user_id):
     try:
+        task = get_task_by_id(task_id)
         delete_task(task_id)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
-    
-    user = get_user_by(user_id)
+
+    user = get_user_by_id(user_id)
     broadcast_task_deleted(workspace_id, task_id, task_title=task.title, actor=user.username)
     return jsonify({"message": "Task deleted."}), 200

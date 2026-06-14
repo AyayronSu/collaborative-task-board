@@ -1,3 +1,4 @@
+# backend/sockets/events.py
 from flask import request
 from flask_socketio import emit, join_room, leave_room
 
@@ -16,17 +17,16 @@ def register_events(socketio):
         sid = request.sid
         print(f"[WS] User disconnected — sid: {sid}")
 
-        for workspace_id, users in list(presence.items()):
-            if sid in users:
-                user = users.pop(sid)
+        for workspace_id in list(presence.keys()):
+            if sid in presence[workspace_id]:
+                user = presence[workspace_id].pop(sid)
                 socketio.emit(
                     "presence_updated",
-                    {"users": list(users.values())},
+                    {"users": list(presence[workspace_id].values())},
                     room=workspace_id,
                 )
-                if not users:
+                if not presence[workspace_id]: 
                     del presence[workspace_id]
-                break
 
     @socketio.on("join_workspace")
     def on_join(data):
@@ -103,3 +103,11 @@ def broadcast_task_deleted(workspace_id, task_id, task_title: str, actor: str):
     _emit(workspace_id, "activity", {
         "message": f"{actor} deleted \"{task_title}\"",
     })
+
+def broadcast_workspace_added(user_id, workspace):
+    register_events.socketio.emit(
+        "workspace_added",
+        {"workspace": workspace.to_dict()},
+        room=f"user_{user_id}",
+    )
+    print(f"[WS] workspace_added sent to user room: user_{user_id}")
