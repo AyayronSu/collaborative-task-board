@@ -7,7 +7,7 @@ from services.membership_service import (
     remove_member,
 )
 from services.workspace_service import get_workspace
-from sockets.events import broadcast_workspace_added
+from sockets.events import broadcast_workspace_added, broadcast_workspace_removed
 
 memberships_bp = Blueprint(
     "memberships", __name__,
@@ -51,6 +51,7 @@ def add_member(workspace_id, user_id):
 def remove_member_route(workspace_id, target_user_id, user_id):
     try:
         remove_member(workspace_id, target_user_id, user_id)
+        broadcast_workspace_removed(target_user_id, workspace_id)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     except PermissionError as e:
