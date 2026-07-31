@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from flask import Flask
+from flask_cors import CORS  # <-- Import flask_cors
 from flask_socketio import SocketIO
 from config import Config
 from models import db
@@ -14,8 +15,16 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    # Dynamic CORS origin checking
     frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173').rstrip('/')
     allowed_origins = [frontend_url, "http://localhost:5173", "http://localhost:3000"]
+
+    # Initialize CORS for REST API endpoints
+    CORS(
+        app,
+        supports_credentials=True,  # REQUIRED for cross-origin cookies/sessions
+        origins=allowed_origins     # Allows your Vercel origin
+    )
 
     db.init_app(app)
     socketio.init_app(
