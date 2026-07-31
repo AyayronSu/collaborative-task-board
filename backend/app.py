@@ -1,3 +1,4 @@
+import os
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -13,10 +14,13 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173').rstrip('/')
+    allowed_origins = [frontend_url, "http://localhost:5173", "http://localhost:3000"]
+
     db.init_app(app)
     socketio.init_app(
         app, 
-        cors_allowed_origins="http://localhost:5173",
+        cors_allowed_origins=allowed_origins,
         logger=True,
         engineio_logger=True,
     )
